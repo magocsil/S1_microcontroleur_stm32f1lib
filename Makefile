@@ -1,0 +1,5 @@
+PROJECT=fixed
+COMPILER=gcc -o
+
+all: ${PROJECT}
+	${COMPILER} ${PROJECT} ${PROJECT}.c
