@@ -13,21 +13,15 @@
 #endif
 
 #define DISP(i,d,m) ((INT(i) < 0) || (FRAC(i,m) < 0)) ? "-" : "", (INT(i) < 0) ? -INT(i) : INT(i), d, (FRAC(i,m) < 0) ? -FRAC(i,m) : FRAC(i,m)
-#define F_STR "%s%d.%.*d"
-
-#define SCALE SCALING_FACTOR
-#define N 4
-#define str(x) #x
-#define xstr(x) str(x)  // convert N to "N"
+#define FIXED_STR "%s%d.%.*d"
 
 void fixedFindMultiplier(long *multiplier, unsigned char *digits);
 long fixedAdd(long p, long q);
 long fixedSubt(long positive, long negative);
 long fixedMul(long p, long q);
 long fixedDiv(long nominator, long denominator, long valueIfError);
-long fixedSq(long p);
-long fixedSqrt(long p, long valueIfError);
-int pow10int(int n);
+long fixedPow(long p, char radicand);
+long fixedRoot(long p, char radical, long valueIfError);
 
 int main(int *arg, char *args[])
 {
@@ -41,18 +35,16 @@ int main(int *arg, char *args[])
 	long diff = fixedSubt(a, b);
 	long prod = fixedMul(a, b);
 	long rate = fixedDiv(a, b, b);
-	long sq = fixedSq(b);
-	long sqrt = fixedSqrt(a, a);
 	
-	printf(F_STR ", " F_STR " -> " F_STR "; " F_STR "; " F_STR "; " F_STR "; " F_STR "; " F_STR "\n", DISP(a, digits, multiplier), DISP(b, digits, multiplier), DISP(sum, digits, multiplier), DISP(diff, digits, multiplier), DISP(prod, digits, multiplier), /*"", INT(rate), digits, FRAC(rate, multiplier)*/DISP(rate, digits, multiplier), DISP(sq, digits, multiplier), DISP(sqrt, digits, multiplier));
+	printf(FIXED_STR ", " FIXED_STR " -> " FIXED_STR "; " FIXED_STR "; " FIXED_STR "; " FIXED_STR "\n", DISP(a, digits, multiplier), DISP(b, digits, multiplier), DISP(sum, digits, multiplier), DISP(diff, digits, multiplier), DISP(prod, digits, multiplier), DISP(rate, digits, multiplier));
+	
+	for(int i = 5; i > -5; i--)
+	{
+		printf(FIXED_STR ", ", DISP(fixedPow(b, i), digits, multiplier));
+		printf(FIXED_STR "\n", DISP(fixedRoot(b, i, 0), digits, multiplier));
+	}
+	
 	return 0;
-}
-
-// https://gcc.gnu.org/onlinedocs/gcc-4.8.5/cpp/Stringification.html
- 
-int pow10int(int n)
-{long x=1,k=n;
- while (k>0) {x*=10;k--;}
 }
 
 void fixedFindMultiplier(long *multiplier, unsigned char *digits)
@@ -73,12 +65,6 @@ long fixedSubt(long positive, long negative)
 long fixedMul(long p, long q)
 {
 	return (long)DOWNSCALED((long long)p * (long long)q);
-	long long tmp;
-	tmp=(long long)p*(long long)q;
-	tmp/=SCALE;
-	
-	return((long)tmp);
-
 }
 
 long fixedDiv(long nominator, long denominator, long valueIfError)
@@ -92,23 +78,55 @@ long fixedDiv(long nominator, long denominator, long valueIfError)
 	return result;
 }
 
-long fixedSq(long p)
+long fixedPow(long p, char radicand)
 {
-	return fixedMul(p, p);
+	char isNegative = 0;
+	if(radicand < 0)
+	{
+		radicand *= -1;
+		isNegative++;
+	}
+	long result = SCALING_FACTOR;
+	for(int i = 0; i < radicand; i++)
+	{
+		result = fixedMul(result, p);
+	}
+	
+	if(isNegative)
+	{
+		result = fixedDiv(SCALING_FACTOR, result, 0);
+	}
+	
+	return result;
 }
 
-long fixedSqrt(long p, long valueIfError)
+long fixedRoot(long p, char radical, long valueIfError)
 {
-	if(p < 0)
+	if(((p < 0) && !(radical & 1)) || !radical)
 	{
 		return valueIfError;
 	}
 	
-	long pNew = SCALING_FACTOR;
-	for(int i = 0; i < 16; i++)
+	char isNegative = 0;
+	if(radical < 0)
 	{
-		pNew = fixedMul(SCALING_FACTOR >> 1, fixedAdd(pNew, fixedDiv(p, pNew, 0)));
+		radical *= -1;
+		isNegative++;
 	}
 	
-	return pNew;
+	long result = SCALING_FACTOR;
+	long change = result;
+	while(change)
+	{
+		long temp = fixedMul(SCALING_FACTOR / radical, fixedAdd(result * (radical - 1), fixedDiv(p, fixedPow(result, (radical - 1)), 0)));
+		change = result - temp;
+		result = temp;
+	}
+	
+	if(isNegative)
+	{
+		result = fixedDiv(SCALING_FACTOR, result, 0);
+	}
+	
+	return result;
 }
